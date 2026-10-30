@@ -60,8 +60,8 @@ jobs:
                   applicationId "com.shield.anupamablocker"
                   minSdk 24
                   targetSdk 34
-                  versionCode 2
-                  versionName "1.1"
+                  versionCode 4
+                  versionName "3.0"
               }
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_17
@@ -81,8 +81,9 @@ jobs:
           cat << 'EOF' | sed 's/^          //' > app/src/main/AndroidManifest.xml
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
               <application
-                  android:allowBackup="true"
+                  android:allowBackup="false"
                   android:label="Anupamaa Shield"
                   android:supportsRtl="true"
                   android:theme="@style/Theme.AppCompat.DayNight.NoActionBar">
@@ -114,20 +115,20 @@ jobs:
           cat << 'EOF' | sed 's/^          //' > app/src/main/res/xml/accessibility_service_config.xml
           <?xml version="1.0" encoding="utf-8"?>
           <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-              android:accessibilityEventTypes="typeWindowContentChanged|typeViewScrolled|typeWindowStateChanged"
+              android:accessibilityEventTypes="typeAllMask"
               android:accessibilityFeedbackType="feedbackGeneric"
-              android:accessibilityFlags="flagDefault|flagReportViewIds|flagRetrieveInteractiveWindows"
+              android:accessibilityFlags="flagDefault|flagIncludeNotImportantViews|flagReportViewIds|flagRetrieveInteractiveWindows"
               android:canPerformGestures="true"
               android:canRetrieveWindowContent="true"
               android:description="@string/accessibility_service_description"
-              android:notificationTimeout="150" />
+              android:notificationTimeout="50" />
           EOF
 
           cat << 'EOF' | sed 's/^          //' > app/src/main/res/values/strings.xml
           <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <string name="app_name">Anupamaa Shield</string>
-              <string name="accessibility_service_description">Monitors your Facebook feed and automatically scrolls past posts, reels, and videos containing Anupamaa keywords.</string>
+              <string name="accessibility_service_description">Blocks and covers everything related to Anupamaa on Facebook.</string>
           </resources>
           EOF
 
@@ -136,33 +137,73 @@ jobs:
           import android.content.Context
           import android.content.Intent
           import android.graphics.Color
+          import android.net.Uri
+          import android.os.Build
           import android.os.Bundle
           import android.provider.Settings
           import android.widget.*
           import androidx.appcompat.app.AppCompatActivity
 
           class MainActivity : AppCompatActivity() {
+              companion object {
+                  const val MASTER_KEYWORDS = "anupama,anupamaa,अनुपमा,अनुज,वनराज,काव्या,रुपाली,रूपाली,rupali,ganguly,anuj,kapadia,vanraj,gaurav khanna,sudhanshu,madalsa,shah house,kapadia mansion,#anupama,#anupamaa,#maan,aadhya,toshu,paritosh,pakhi,kinjal,baaa,leela,hasmukh,samar,dimpy,dimple,choti anu,rahi,prem,starplus,star plus,jiohotstar,hotstar,telly gupshup,mr zinxx,viral hit,episode 21"
+              }
+
               override fun onCreate(savedInstanceState: Bundle?) {
                   super.onCreate(savedInstanceState)
-                  val prefs = getSharedPreferences("AnupamaPrefs", Context.MODE_PRIVATE)
-                  val defaultKeywords = "anupama,anupamaa,अनुपमा,rupali ganguly,रूपाली गांगुली,anuj kapadia,vanraj shah,gaurav khanna,#anupamaa,#maan,shah house"
-                  val layout = LinearLayout(this).apply {
-                      orientation = LinearLayout.VERTICAL
-                      setPadding(48, 64, 48, 48)
+                  val prefs = getSharedPreferences("AnupamaPrefs_v3", Context.MODE_PRIVATE)
+                  if (!prefs.contains("keywords")) {
+                      prefs.edit().putString("keywords", MASTER_KEYWORDS).apply()
+                  }
+
+                  val scroll = ScrollView(this).apply {
                       setBackgroundColor(Color.parseColor("#0F172A"))
                   }
+                  val layout = LinearLayout(this).apply {
+                      orientation = LinearLayout.VERTICAL
+                      setPadding(48, 64, 48, 64)
+                  }
                   val title = TextView(this).apply {
-                      text = "Anupamaa Shield v1.1"
+                      text = "Anupamaa Shield v3.0"
                       textSize = 26f
                       setTextColor(Color.WHITE)
-                      setPadding(0, 0, 0, 16)
+                      setPadding(0, 0, 0, 8)
                   }
                   val subtitle = TextView(this).apply {
-                      text = "Native Facebook Content & Reel Blocker"
-                      textSize = 14f
-                      setTextColor(Color.parseColor("#94A3B8"))
-                      setPadding(0, 0, 0, 48)
+                      text = "NUCLEAR MODE: Full Blackout + Auto-Scroll + Auto-Back"
+                      textSize = 13f
+                      setTextColor(Color.parseColor("#EF4444"))
+                      setPadding(0, 0, 0, 36)
                   }
+
+                  val overlayBtn = Button(this).apply {
+                      text = "Step 1: Allow 'Display Over Other Apps'"
+                      setBackgroundColor(Color.parseColor("#F59E0B"))
+                      setTextColor(Color.BLACK)
+                      setOnClickListener {
+                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                              val intent = Intent(
+                                  Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                  Uri.parse("package:$packageName")
+                              )
+                              startActivity(intent)
+                          }
+                      }
+                  }
+
+                  val spacer1 = Space(this).apply { minimumHeight = 24 }
+
+                  val enableServiceBtn = Button(this).apply {
+                      text = "Step 2: Enable Accessibility Shield"
+                      setBackgroundColor(Color.parseColor("#10B981"))
+                      setTextColor(Color.WHITE)
+                      setOnClickListener {
+                          startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                      }
+                  }
+
+                  val spacer2 = Space(this).apply { minimumHeight = 36 }
+
                   val keywordLabel = TextView(this).apply {
                       text = "Blocked Keywords (comma-separated):"
                       textSize = 14f
@@ -170,37 +211,32 @@ jobs:
                       setPadding(0, 0, 0, 12)
                   }
                   val keywordInput = EditText(this).apply {
-                      setText(prefs.getString("keywords", defaultKeywords))
+                      setText(prefs.getString("keywords", MASTER_KEYWORDS))
                       setTextColor(Color.WHITE)
                       setBackgroundColor(Color.parseColor("#1E293B"))
                       setPadding(24, 24, 24, 24)
                   }
                   val saveBtn = Button(this).apply {
-                      text = "Save Keywords"
+                      text = "Save Custom Keywords"
                       setBackgroundColor(Color.parseColor("#2563EB"))
                       setTextColor(Color.WHITE)
                       setOnClickListener {
                           prefs.edit().putString("keywords", keywordInput.text.toString()).apply()
-                          Toast.makeText(this@MainActivity, "Keywords updated!", Toast.LENGTH_SHORT).show()
+                          Toast.makeText(this@MainActivity, "Keywords Updated!", Toast.LENGTH_SHORT).show()
                       }
                   }
-                  val spacer = Space(this).apply { minimumHeight = 40 }
-                  val enableServiceBtn = Button(this).apply {
-                      text = "1. Enable Accessibility Shield"
-                      setBackgroundColor(Color.parseColor("#10B981"))
-                      setTextColor(Color.WHITE)
-                      setOnClickListener {
-                          startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-                      }
-                  }
+
                   layout.addView(title)
                   layout.addView(subtitle)
+                  layout.addView(overlayBtn)
+                  layout.addView(spacer1)
+                  layout.addView(enableServiceBtn)
+                  layout.addView(spacer2)
                   layout.addView(keywordLabel)
                   layout.addView(keywordInput)
                   layout.addView(saveBtn)
-                  layout.addView(spacer)
-                  layout.addView(enableServiceBtn)
-                  setContentView(layout)
+                  scroll.addView(layout)
+                  setContentView(scroll)
               }
           }
           EOF
@@ -210,80 +246,268 @@ jobs:
           import android.accessibilityservice.AccessibilityService
           import android.accessibilityservice.GestureDescription
           import android.content.Context
+          import android.graphics.Canvas
+          import android.graphics.Color
+          import android.graphics.Paint
           import android.graphics.Path
+          import android.graphics.PixelFormat
+          import android.graphics.Rect
+          import android.os.Build
+          import android.os.Handler
+          import android.os.Looper
+          import android.provider.Settings
+          import android.view.View
+          import android.view.WindowManager
           import android.view.accessibility.AccessibilityEvent
           import android.view.accessibility.AccessibilityNodeInfo
           import android.widget.Toast
 
           class AnupamaBlockerService : AccessibilityService() {
-              private var lastScrollTime = 0L
+              private var lastActionTime = 0L
+              private var windowManager: WindowManager? = null
+              private var overlayView: BlackoutOverlayView? = null
+              private val mainHandler = Handler(Looper.getMainLooper())
+
+              private val scanRunnable = object : Runnable {
+                  override fun run() {
+                      scanEntireScreen()
+                      mainHandler.postDelayed(this, 250)
+                  }
+              }
+
+              inner class BlackoutOverlayView(context: Context) : View(context) {
+                  var blockedRects: List<Rect> = emptyList()
+                  var fullScreenLock: Boolean = false
+
+                  private val boxPaint = Paint().apply {
+                      color = Color.parseColor("#090D16")
+                      style = Paint.Style.FILL
+                  }
+                  private val borderPaint = Paint().apply {
+                      color = Color.parseColor("#EF4444")
+                      style = Paint.Style.STROKE
+                      strokeWidth = 8f
+                  }
+                  private val titlePaint = Paint().apply {
+                      color = Color.parseColor("#EF4444")
+                      textSize = 46f
+                      isFakeBoldText = true
+                      isAntiAlias = true
+                      textAlign = Paint.Align.CENTER
+                  }
+                  private val subPaint = Paint().apply {
+                      color = Color.WHITE
+                      textSize = 32f
+                      isAntiAlias = true
+                      textAlign = Paint.Align.CENTER
+                  }
+
+                  override fun onDraw(canvas: Canvas) {
+                      super.onDraw(canvas)
+                      if (fullScreenLock) {
+                          val full = Rect(0, 0, width, height)
+                          canvas.drawRect(full, boxPaint)
+                          canvas.drawText("🚫 ANUPAMAA PAGE BLOCKED", width / 2f, height / 2f - 30f, titlePaint)
+                          canvas.drawText("Auto-exiting / scrolling away...", width / 2f, height / 2f + 35f, subPaint)
+                          return
+                      }
+                      for (rect in blockedRects) {
+                          canvas.drawRect(rect, boxPaint)
+                          canvas.drawRect(rect, borderPaint)
+                          canvas.drawText(
+                              "🚫 ANUPAMAA BLOCKED",
+                              rect.exactCenterX(),
+                              rect.exactCenterY(),
+                              titlePaint
+                          )
+                      }
+                  }
+              }
 
               override fun onServiceConnected() {
                   super.onServiceConnected()
-                  Toast.makeText(this, "Anupamaa Shield Active!", Toast.LENGTH_SHORT).show()
+                  Toast.makeText(this, "Anupamaa Shield v3.0 NUCLEAR ACTIVE!", Toast.LENGTH_LONG).show()
+                  setupOverlay()
+                  mainHandler.post(scanRunnable)
+              }
+
+              private fun setupOverlay() {
+                  if (overlayView != null) return
+                  try {
+                      windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
+                      overlayView = BlackoutOverlayView(this)
+
+                      val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M && Settings.canDrawOverlays(this)) {
+                          if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                              WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+                          } else {
+                              WindowManager.LayoutParams.TYPE_PHONE
+                          }
+                      } else {
+                          WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+                      }
+
+                      val params = WindowManager.LayoutParams(
+                          WindowManager.LayoutParams.MATCH_PARENT,
+                          WindowManager.LayoutParams.MATCH_PARENT,
+                          overlayType,
+                          WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                                  WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
+                                  WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
+                          PixelFormat.TRANSLUCENT
+                      )
+                      windowManager?.addView(overlayView, params)
+                  } catch (e: Exception) {}
               }
 
               private fun getKeywords(): List<String> {
-                  val prefs = getSharedPreferences("AnupamaPrefs", Context.MODE_PRIVATE)
-                  val raw = prefs.getString("keywords", "anupama,anupamaa,अनुपमा,rupali ganguly,रूपाली गांगुली,anuj kapadia,vanraj shah,gaurav khanna,#anupamaa,#maan,shah house") ?: ""
+                  val prefs = getSharedPreferences("AnupamaPrefs_v3", Context.MODE_PRIVATE)
+                  val raw = prefs.getString("keywords", MainActivity.MASTER_KEYWORDS) ?: MainActivity.MASTER_KEYWORDS
                   return raw.split(",").map { it.trim().lowercase() }.filter { it.isNotEmpty() }
               }
 
               override fun onAccessibilityEvent(event: AccessibilityEvent?) {
+                  scanEntireScreen()
+              }
+
+              private fun scanEntireScreen() {
                   try {
-                      val pkg = event?.packageName?.toString()?.lowercase() ?: ""
-                      if (!pkg.contains("facebook")) return
+                      val allRoots = mutableListOf<AccessibilityNodeInfo>()
+                      rootInActiveWindow?.let { allRoots.add(it) }
+                      try {
+                          for (win in windows) {
+                              win.root?.let { allRoots.add(it) }
+                          }
+                      } catch (e: Exception) {}
+
+                      if (allRoots.isEmpty()) {
+                          updateOverlay(emptyList(), false)
+                          return
+                      }
+
+                      // Check if user is inside Facebook or a Browser
+                      var isTargetApp = false
+                      for (r in allRoots) {
+                          val pkg = r.packageName?.toString()?.lowercase() ?: ""
+                          if (pkg.contains("facebook") || pkg.contains("chrome") || pkg.contains("brave") || pkg.contains("firefox")) {
+                              isTargetApp = true
+                              break
+                          }
+                      }
+
+                      if (!isTargetApp) {
+                          updateOverlay(emptyList(), false)
+                          return
+                      }
+
+                      val keywords = getKeywords()
+                      val matchedRects = mutableListOf<Rect>()
+                      for (r in allRoots) {
+                          collectBlockedNodes(r, keywords, matchedRects)
+                      }
+
+                      val fullPageDetected = matchedRects.size >= 2
+                      updateOverlay(matchedRects, fullPageDetected)
 
                       val now = System.currentTimeMillis()
-                      if (now - lastScrollTime < 900) return
-
-                      val rootNode = rootInActiveWindow ?: return
-                      val keywords = getKeywords()
-                      if (scanNodeForAnupama(rootNode, keywords)) {
-                          lastScrollTime = now
-                          performFastSwipeUp()
+                      if (matchedRects.isNotEmpty() && now - lastActionTime > 700) {
+                          lastActionTime = now
+                          if (fullPageDetected) {
+                              // If it's a search results grid full of Anupama, swipe AND press Back
+                              performFastSwipeUp()
+                              performGlobalAction(GLOBAL_ACTION_BACK)
+                          } else {
+                              performFastSwipeUp()
+                          }
                       }
-                  } catch (e: Exception) {
-                      // Prevent crash on MIUI window transitions
+                  } catch (e: Exception) {}
+              }
+
+              private fun updateOverlay(rects: List<Rect>, fullLock: Boolean) {
+                  mainHandler.post {
+                      if (overlayView == null) setupOverlay()
+                      overlayView?.blockedRects = rects
+                      overlayView?.fullScreenLock = fullLock
+                      overlayView?.invalidate()
                   }
               }
 
-              private fun scanNodeForAnupama(node: AccessibilityNodeInfo?, keywords: List<String>): Boolean {
-                  if (node == null) return false
+              private fun collectBlockedNodes(
+                  node: AccessibilityNodeInfo?,
+                  keywords: List<String>,
+                  outRects: MutableList<Rect>
+              ) {
+                  if (node == null) return
                   try {
-                      val text = node.text?.toString()?.lowercase() ?: ""
-                      val desc = node.contentDescription?.toString()?.lowercase() ?: ""
-                      for (kw in keywords) {
-                          if (text.contains(kw) || desc.contains(kw)) return true
+                      val sb = StringBuilder()
+                      node.text?.let { sb.append(it).append(" ") }
+                      node.contentDescription?.let { sb.append(it).append(" ") }
+                      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                          node.hintText?.let { sb.append(it).append(" ") }
                       }
+                      val combined = sb.toString().lowercase()
+
+                      var matched = false
+                      if (combined.isNotEmpty()) {
+                          for (kw in keywords) {
+                              if (combined.contains(kw)) {
+                                  matched = true
+                                  break
+                              }
+                          }
+                      }
+
+                      if (matched) {
+                          val rect = Rect()
+                          node.getBoundsInScreen(rect)
+                          if (rect.width() > 30 && rect.height() > 20) {
+                              val screenW = resources.displayMetrics.widthPixels
+                              val screenH = resources.displayMetrics.heightPixels
+                              // Cover the entire card + video thumbnail above & below the caption
+                              val expanded = Rect(
+                                  0,
+                                  (rect.top - 550).coerceAtLeast(140),
+                                  screenW,
+                                  (rect.bottom + 250).coerceAtMost(screenH)
+                              )
+                              outRects.add(expanded)
+                          }
+                      }
+
                       for (i in 0 until node.childCount) {
-                          val child = node.getChild(i)
-                          if (scanNodeForAnupama(child, keywords)) return true
+                          collectBlockedNodes(node.getChild(i), keywords, outRects)
                       }
-                  } catch (e: Exception) {
-                      return false
-                  }
-                  return false
+                  } catch (e: Exception) {}
               }
 
               private fun performFastSwipeUp() {
                   try {
                       val displayMetrics = resources.displayMetrics
                       val midX = displayMetrics.widthPixels / 2f
-                      val startY = displayMetrics.heightPixels * 0.80f
-                      val endY = displayMetrics.heightPixels * 0.15f
+                      val startY = displayMetrics.heightPixels * 0.85f
+                      val endY = displayMetrics.heightPixels * 0.10f
                       val swipePath = Path().apply {
                           moveTo(midX, startY)
                           lineTo(midX, endY)
                       }
                       val gesture = GestureDescription.Builder()
-                          .addStroke(GestureDescription.StrokeDescription(swipePath, 0, 180))
+                          .addStroke(GestureDescription.StrokeDescription(swipePath, 0, 140))
                           .build()
                       dispatchGesture(gesture, null, null)
                   } catch (e: Exception) {}
               }
 
-              override fun onInterrupt() {}
+              override fun onInterrupt() {
+                  updateOverlay(emptyList(), false)
+              }
+
+              override fun onDestroy() {
+                  super.onDestroy()
+                  mainHandler.removeCallbacks(scanRunnable)
+                  try {
+                      if (overlayView != null) windowManager?.removeView(overlayView)
+                  } catch (e: Exception) {}
+              }
           }
           EOF
 
@@ -304,5 +528,5 @@ jobs:
       - name: Upload Compiled APK
         uses: actions/upload-artifact@v4
         with:
-          name: AnupamaShield-v1.1-APK
+          name: AnupamaShield-v3.0-NUCLEAR-APK
           path: app/build/outputs/apk/debug/app-debug.apk
