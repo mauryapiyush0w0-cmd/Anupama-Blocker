@@ -15,7 +15,7 @@ jobs:
           mkdir -p app/src/main/res/xml
           mkdir -p app/src/main/res/values
 
-          cat << 'EOF' > settings.gradle
+          cat << 'EOF' | sed 's/^          //' > settings.gradle
           pluginManagement {
               repositories {
                   google()
@@ -34,21 +34,21 @@ jobs:
           include ':app'
           EOF
 
-          cat << 'EOF' > build.gradle
+          cat << 'EOF' | sed 's/^          //' > build.gradle
           plugins {
               id 'com.android.application' version '8.2.0' apply false
               id 'org.jetbrains.kotlin.android' version '1.9.20' apply false
           }
           EOF
 
-          cat << 'EOF' > gradle.properties
+          cat << 'EOF' | sed 's/^          //' > gradle.properties
           org.gradle.jvmargs=-Xmx2048m -Dfile.encoding=UTF-8
           android.useAndroidX=true
           kotlin.code.style=official
           android.nonTransitiveRClass=true
           EOF
 
-          cat << 'EOF' > app/build.gradle
+          cat << 'EOF' | sed 's/^          //' > app/build.gradle
           plugins {
               id 'com.android.application'
               id 'org.jetbrains.kotlin.android'
@@ -58,10 +58,10 @@ jobs:
               compileSdk 34
               defaultConfig {
                   applicationId "com.shield.anupamablocker"
-                  minSdk 26
+                  minSdk 24
                   targetSdk 34
-                  versionCode 1
-                  versionName "1.0"
+                  versionCode 2
+                  versionName "1.1"
               }
               compileOptions {
                   sourceCompatibility JavaVersion.VERSION_17
@@ -78,7 +78,7 @@ jobs:
           }
           EOF
 
-          cat << 'EOF' > app/src/main/AndroidManifest.xml
+          cat << 'EOF' | sed 's/^          //' > app/src/main/AndroidManifest.xml
           <?xml version="1.0" encoding="utf-8"?>
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
               <application
@@ -96,6 +96,7 @@ jobs:
                   </activity>
                   <service
                       android:name=".AnupamaBlockerService"
+                      android:enabled="true"
                       android:exported="true"
                       android:label="Anupamaa Facebook Blocker"
                       android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
@@ -110,27 +111,27 @@ jobs:
           </manifest>
           EOF
 
-          cat << 'EOF' > app/src/main/res/xml/accessibility_service_config.xml
+          cat << 'EOF' | sed 's/^          //' > app/src/main/res/xml/accessibility_service_config.xml
           <?xml version="1.0" encoding="utf-8"?>
           <accessibility-service xmlns:android="http://schemas.android.com/apk/res/android"
-              android:accessibilityEventTypes="typeWindowContentChanged|typeViewScrolled"
+              android:accessibilityEventTypes="typeWindowContentChanged|typeViewScrolled|typeWindowStateChanged"
               android:accessibilityFeedbackType="feedbackGeneric"
-              android:accessibilityFlags="flagReportViewIds|flagRetrieveInteractiveWindows"
+              android:accessibilityFlags="flagDefault|flagReportViewIds|flagRetrieveInteractiveWindows"
               android:canPerformGestures="true"
               android:canRetrieveWindowContent="true"
               android:description="@string/accessibility_service_description"
-              android:notificationTimeout="150"
-              android:packageNames="com.facebook.katana,com.facebook.lite" />
+              android:notificationTimeout="150" />
           EOF
 
-          cat << 'EOF' > app/src/main/res/values/strings.xml
+          cat << 'EOF' | sed 's/^          //' > app/src/main/res/values/strings.xml
+          <?xml version="1.0" encoding="utf-8"?>
           <resources>
               <string name="app_name">Anupamaa Shield</string>
-              <string name="accessibility_service_description">Automatically scrolls past Anupamaa posts and reels on Facebook.</string>
+              <string name="accessibility_service_description">Monitors your Facebook feed and automatically scrolls past posts, reels, and videos containing Anupamaa keywords.</string>
           </resources>
           EOF
 
-          cat << 'EOF' > app/src/main/java/com/shield/anupamablocker/MainActivity.kt
+          cat << 'EOF' | sed 's/^          //' > app/src/main/java/com/shield/anupamablocker/MainActivity.kt
           package com.shield.anupamablocker
           import android.content.Context
           import android.content.Intent
@@ -151,7 +152,7 @@ jobs:
                       setBackgroundColor(Color.parseColor("#0F172A"))
                   }
                   val title = TextView(this).apply {
-                      text = "Anupamaa Shield"
+                      text = "Anupamaa Shield v1.1"
                       textSize = 26f
                       setTextColor(Color.WHITE)
                       setPadding(0, 0, 0, 16)
@@ -204,7 +205,7 @@ jobs:
           }
           EOF
 
-          cat << 'EOF' > app/src/main/java/com/shield/anupamablocker/AnupamaBlockerService.kt
+          cat << 'EOF' | sed 's/^          //' > app/src/main/java/com/shield/anupamablocker/AnupamaBlockerService.kt
           package com.shield.anupamablocker
           import android.accessibilityservice.AccessibilityService
           import android.accessibilityservice.GestureDescription
@@ -212,50 +213,76 @@ jobs:
           import android.graphics.Path
           import android.view.accessibility.AccessibilityEvent
           import android.view.accessibility.AccessibilityNodeInfo
+          import android.widget.Toast
 
           class AnupamaBlockerService : AccessibilityService() {
               private var lastScrollTime = 0L
+
+              override fun onServiceConnected() {
+                  super.onServiceConnected()
+                  Toast.makeText(this, "Anupamaa Shield Active!", Toast.LENGTH_SHORT).show()
+              }
+
               private fun getKeywords(): List<String> {
                   val prefs = getSharedPreferences("AnupamaPrefs", Context.MODE_PRIVATE)
                   val raw = prefs.getString("keywords", "anupama,anupamaa,अनुपमा,rupali ganguly,रूपाली गांगुली,anuj kapadia,vanraj shah,gaurav khanna,#anupamaa,#maan,shah house") ?: ""
                   return raw.split(",").map { it.trim().lowercase() }.filter { it.isNotEmpty() }
               }
+
               override fun onAccessibilityEvent(event: AccessibilityEvent?) {
-                  val rootNode = rootInActiveWindow ?: return
-                  val now = System.currentTimeMillis()
-                  if (now - lastScrollTime < 800) return
-                  val keywords = getKeywords()
-                  if (scanNodeForAnupama(rootNode, keywords)) {
-                      lastScrollTime = now
-                      performFastSwipeUp()
+                  try {
+                      val pkg = event?.packageName?.toString()?.lowercase() ?: ""
+                      if (!pkg.contains("facebook")) return
+
+                      val now = System.currentTimeMillis()
+                      if (now - lastScrollTime < 900) return
+
+                      val rootNode = rootInActiveWindow ?: return
+                      val keywords = getKeywords()
+                      if (scanNodeForAnupama(rootNode, keywords)) {
+                          lastScrollTime = now
+                          performFastSwipeUp()
+                      }
+                  } catch (e: Exception) {
+                      // Prevent crash on MIUI window transitions
                   }
               }
+
               private fun scanNodeForAnupama(node: AccessibilityNodeInfo?, keywords: List<String>): Boolean {
                   if (node == null) return false
-                  val text = node.text?.toString()?.lowercase() ?: ""
-                  val desc = node.contentDescription?.toString()?.lowercase() ?: ""
-                  for (kw in keywords) {
-                      if (text.contains(kw) || desc.contains(kw)) return true
-                  }
-                  for (i in 0 until node.childCount) {
-                      if (scanNodeForAnupama(node.getChild(i), keywords)) return true
+                  try {
+                      val text = node.text?.toString()?.lowercase() ?: ""
+                      val desc = node.contentDescription?.toString()?.lowercase() ?: ""
+                      for (kw in keywords) {
+                          if (text.contains(kw) || desc.contains(kw)) return true
+                      }
+                      for (i in 0 until node.childCount) {
+                          val child = node.getChild(i)
+                          if (scanNodeForAnupama(child, keywords)) return true
+                      }
+                  } catch (e: Exception) {
+                      return false
                   }
                   return false
               }
+
               private fun performFastSwipeUp() {
-                  val displayMetrics = resources.displayMetrics
-                  val midX = displayMetrics.widthPixels / 2f
-                  val startY = displayMetrics.heightPixels * 0.80f
-                  val endY = displayMetrics.heightPixels * 0.15f
-                  val swipePath = Path().apply {
-                      moveTo(midX, startY)
-                      lineTo(midX, endY)
-                  }
-                  val gesture = GestureDescription.Builder()
-                      .addStroke(GestureDescription.StrokeDescription(swipePath, 0, 180))
-                      .build()
-                  dispatchGesture(gesture, null, null)
+                  try {
+                      val displayMetrics = resources.displayMetrics
+                      val midX = displayMetrics.widthPixels / 2f
+                      val startY = displayMetrics.heightPixels * 0.80f
+                      val endY = displayMetrics.heightPixels * 0.15f
+                      val swipePath = Path().apply {
+                          moveTo(midX, startY)
+                          lineTo(midX, endY)
+                      }
+                      val gesture = GestureDescription.Builder()
+                          .addStroke(GestureDescription.StrokeDescription(swipePath, 0, 180))
+                          .build()
+                      dispatchGesture(gesture, null, null)
+                  } catch (e: Exception) {}
               }
+
               override fun onInterrupt() {}
           }
           EOF
@@ -277,6 +304,5 @@ jobs:
       - name: Upload Compiled APK
         uses: actions/upload-artifact@v4
         with:
-          name: AnupamaShield-APK
+          name: AnupamaShield-v1.1-APK
           path: app/build/outputs/apk/debug/app-debug.apk
-          
